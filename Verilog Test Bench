@@ -46,7 +46,7 @@ bit [31:0] aluout;
 // Read in instructions
 bit [31:0] insns [32];
 initial begin
-    $readmemb("newInstSet.txt", insns);
+    $readmemb("Binary Instructions.txt", insns);
     regs[0] = 2;
     regs[1] = 2;
     regs[2] = 4;
