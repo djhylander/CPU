@@ -1,0 +1,132 @@
+/*
+  Test bench for simple CPU in Verilog
+
+@author Dylan Hylander
+*/
+
+module CPU (
+  input bit clk,
+  input bit rst
+);
+
+bit[31:0] regs[32];
+bit[31:0] insnval;
+bit[4:0] rs1;
+bit[4:0] rs2;
+bit[4:0] rd;
+bit[31:0] subres;
+bit[31:0] rs1val;
+bit[31:0] rs2val;
+bit[31:0] rdval;
+bit rden;
+bit[4:0] pc;
+bit[4:0] next_pc;
+bit[4:0] branch_target;
+bit is_branch;
+bit[4:0] opcode;
+bit[2:0] cc;
+ 
+bit cceq;
+bit ccnotEq;
+bit ccless;
+bit cclessEq;
+bit ccmore;
+bit ccmoreEq;
+
+bit lt;
+bit lten;
+bit eq;
+bit eqen;
+bit next_lt;
+bit next_eq;
+bit halt;
+  
+bit [31:0] aluout;
+
+// Read in instructions
+bit [31:0] insns [32];
+initial begin
+    $readmemb("newInstSet.txt", insns);
+    regs[0] = 2;
+    regs[1] = 2;
+    regs[2] = 4;
+    regs[3] = 1;
+end
+
+
+// Instruction fetch and decode
+assign insnval = insns[pc];
+assign opcode = insnval[31:27];
+assign rs1 = insnval[26:22];
+assign rs2 = insnval[21:17];
+assign rd = insnval[16:12];
+assign cc = insnval[26:24];
+assign branch_target = insnval[4:0];
+
+// Branch logic
+assign is_branch = (opcode == 4) && ((cc == 0 && cceq) ||
+                                         (cc == 1 && ccnotEq) ||
+                                         (cc == 2 && ccless) ||
+                                         (cc == 3 && cclessEq) ||
+                                         (cc == 4 && ccmore) ||
+                                         (cc == 5 && ccmoreEq));
+assign cceq = eq;
+assign ccnotEq = !eq;
+assign ccless = lt;
+assign cclessEq = eq && lt;
+assign ccmore = !lt && !eq;
+assign ccmoreEq = !lt;
+
+assign next_pc = is_branch ? branch_target : (pc + 1);
+
+// Register read
+assign rs1val = regs[rs1];
+assign rs2val = regs[rs2];
+
+// ALU logic
+assign subres = rs1val - rs2val;
+assign aluout = opcode == 1 ? rs1val + rs2val : // add/sub
+          	opcode == 2 ? subres : 0;
+
+// Comparison logic
+assign next_lt = subres[31];
+assign lten = opcode == 3;
+assign next_eq = (rs1val == rs2val);// or subres == 0
+assign eqen = opcode == 3;
+
+// Register writeback
+assign rdval = aluout;
+assign rden = !rst && (opcode != 4 && opcode != 3); // not branch or comp
+
+// Stop logic
+assign halt = opcode == 5;
+
+// State
+always @(posedge clk)
+  if (rst)
+    eq <= 1'b0;
+  else if (eqen)
+    eq <= next_eq;
+  
+always @(posedge clk)
+  if (rst)
+    lt <= 1'b0;
+  else if (lten)
+    lt <= next_lt;
+   
+always @(posedge clk)
+  if (rst)
+    pc <= 5'd0;
+  else if (!halt)
+    pc <= next_pc;
+
+
+// Register file
+always @(posedge clk)
+    if (rden)
+      regs[rd] <= rdval;
+
+endmodule
+
+
+
